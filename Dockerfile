@@ -32,5 +32,5 @@ ENV BASE_DIR=/app
 ENV UPLOAD_FOLDER=/app/uploads
 ENV OUTPUT_FOLDER=/app/outputs
 
-# Use uvicorn to run the FastAPI app
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "3020"]
+# Use gunicorn with uvicorn workers for high-concurrency performance
+CMD ["gunicorn", "main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:3020", "--timeout", "120"]

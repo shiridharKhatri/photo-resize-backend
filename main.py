@@ -56,13 +56,13 @@ def cleanup_old_files():
 # --- IMAGE PROCESSING UTILS ---
 def resize_image_task(img, target_w, target_h, mode):
     if mode == 'stretch':
-        return img.resize((target_w, target_h), Image.Resampling.LANCZOS)
+        return img.resize((target_w, target_h), Image.Resampling.BICUBIC)
     elif mode == 'cover':
-        return ImageOps.fit(img, (target_w, target_h), method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
+        return ImageOps.fit(img, (target_w, target_h), method=Image.Resampling.BICUBIC, centering=(0.5, 0.5))
     elif mode == 'contain':
         base = Image.new('RGBA', (target_w, target_h), (0,0,0,0))
         thumb = img.copy()
-        thumb.thumbnail((target_w, target_h), Image.Resampling.LANCZOS)
+        thumb.thumbnail((target_w, target_h), Image.Resampling.BICUBIC)
         left = (target_w - thumb.width) // 2
         top = (target_h - thumb.height) // 2
         base.paste(thumb, (left, top))
@@ -199,7 +199,7 @@ async def process_images(data: Request):
                     out_filename = f"{uuid.uuid4()}.{format_opt.lower()}"
                     out_path = os.path.join(OUTPUT_FOLDER, out_filename)
                     
-                    save_kwargs = {'optimize': True}
+                    save_kwargs = {}
                     if format_opt in ['JPEG', 'WEBP']: save_kwargs['quality'] = quality
                     
                     final.save(out_path, format=format_opt, **save_kwargs)
