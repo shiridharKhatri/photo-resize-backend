@@ -9,7 +9,7 @@ from fastapi import FastAPI, UploadFile, File, Request
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image, ImageOps, ImageColor
-from rembg import remove as rembg_remove
+from rembg import remove as rembg_remove, new_session as rembg_new_session
 from io import BytesIO
 
 try:
@@ -17,6 +17,9 @@ try:
     register_heif_opener()
 except ImportError:
     pass
+
+# Pre-load the AI session (this makes processing 5-10x faster after first run)
+REMBG_SESSION = rembg_new_session()
 
 app = FastAPI(title="Studio Engine API")
 
@@ -146,12 +149,13 @@ async def process_images(data: Request):
             
             try:
                 img = Image.open(source_path)
+                img = ImageOps.exif_transpose(img) # Apply EXIF orientation early
                 if img.mode not in ['RGBA', 'RGB']: img = img.convert('RGB')
                 
                 # BG REMOVE
                 if body.get('bg_remove', False):
                     yield json.dumps({'type': 'progress', 'message': "Extracting Background..."}) + "\n"
-                    img = rembg_remove(img)
+                    img = rembg_remove(img, session=REMBG_SESSION)
                 
                 requests = body.get('requests', [])
                 if not requests:
@@ -234,8 +238,10 @@ def preview_file(filename: str):
     if ext in ['heic', 'heif']:
         try:
             with Image.open(path) as img:
+                # Standardize orientation early (fast)
+                img = ImageOps.exif_transpose(img)
                 if img.mode != 'RGB' and img.mode != 'RGBA':
-                    img = img.convert('RGB')
+                    img = img.convert("RGBA")
                 buffer = BytesIO()
                 # Use JPEG for speed in preview
                 img.save(buffer, format="JPEG", quality=75)
