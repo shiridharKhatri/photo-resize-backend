@@ -269,6 +269,17 @@ async def create_zip(data: Request):
     return {"success": True, "url": f"/api/download/{zip_name}"}
 
 
+@app.get("/")
+async def root():
+    return JSONResponse(
+        status_code=200, 
+        content={
+            "success": True, 
+            "message": "Photo resizer server is active",
+            "path": "/"
+        }
+    )
+
 @app.get("/{path:path}")
 async def catch_all(path: str):
     return JSONResponse(
@@ -276,7 +287,7 @@ async def catch_all(path: str):
         content={
             "success": True, 
             "message": "Photo resizer server is active",
-            "captured_path": path
+            "captured_path": f"/{path}"
         }
     )
 
