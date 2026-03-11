@@ -70,7 +70,8 @@ def resize_image_task(img, target_w, target_h, mode):
         top = (target_h - thumb.height) // 2
         base.paste(thumb, (left, top))
         return base
-    return img
+    # Fallback: Ensure it matches target_w, target_h to avoid "half-image" pasting issues
+    return img.resize((target_w, target_h), Image.Resampling.BICUBIC)
 
 def get_bg_image(w, h, fill, out_mode, bg_color_map):
     if fill in bg_color_map:
@@ -173,12 +174,15 @@ async def process_images(data: Request):
                     
                     current_img = img.copy()
                     
-                    # CROP
+                    # CROP with safety bounds
                     crop_data = req.get('crop')
                     if crop_data:
-                        cx, cy = int(crop_data['x']), int(crop_data['y'])
-                        cw, ch = int(crop_data['w']), int(crop_data['h'])
-                        if cw > 0 and ch > 0: current_img = current_img.crop((cx, cy, cx + cw, cy + ch))
+                        img_w, img_h = current_img.size
+                        cx = max(0, min(int(crop_data['x']), img_w - 1))
+                        cy = max(0, min(int(crop_data['y']), img_h - 1))
+                        cw = max(1, min(int(crop_data['w']), img_w - cx))
+                        ch = max(1, min(int(crop_data['h']), img_h - cy))
+                        current_img = current_img.crop((cx, cy, cx + cw, cy + ch))
                     
                     processed = resize_image_task(current_img, req_w, req_h, mode)
                     
