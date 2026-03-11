@@ -167,8 +167,9 @@ async def process_images(data: Request):
                 bg_fill = body.get('bg_fill', 'white')
                 
                 for req in requests:
-                    req_w = int(req.get('width'))
-                    req_h = int(req.get('height'))
+                    # If width/height are 0 or missing, use the original dimensions
+                    req_w = int(req.get('width', 0))
+                    req_h = int(req.get('height', 0))
                     mode = req.get('mode', 'contain')
                     label = req.get('label', 'processed')
                     
@@ -184,10 +185,14 @@ async def process_images(data: Request):
                         ch = max(1, min(int(crop_data['h']), img_h - cy))
                         current_img = current_img.crop((cx, cy, cx + cw, cy + ch))
                     
-                    processed = resize_image_task(current_img, req_w, req_h, mode)
+                    # If target size is 0, maintain the (possibly cropped) original size
+                    final_w = req_w if req_w > 0 else current_img.width
+                    final_h = req_h if req_h > 0 else current_img.height
+                    
+                    processed = resize_image_task(current_img, final_w, final_h, mode)
                     
                     out_mode = 'RGB' if (format_opt == 'JPEG' and bg_fill != 'transparent') else 'RGBA'
-                    final = get_bg_image(req_w, req_h, bg_fill, out_mode, bg_color_map)
+                    final = get_bg_image(final_w, final_h, bg_fill, out_mode, bg_color_map)
                     
                     if out_mode == 'RGBA' and format_opt != 'JPEG':
                         if processed.mode != 'RGBA': processed = processed.convert('RGBA')
@@ -237,24 +242,29 @@ def preview_file(filename: str):
     if not os.path.exists(path):
         return JSONResponse(status_code=404, content={"error": "Not found"})
     
-    # Handle browser-incompatible formats for preview
     ext = os.path.splitext(filename)[1].lower().replace('.', '')
-    if ext in ['heic', 'heif']:
-        try:
-            with Image.open(path) as img:
-                # Standardize orientation early (fast)
-                img = ImageOps.exif_transpose(img)
-                if img.mode != 'RGB' and img.mode != 'RGBA':
-                    img = img.convert("RGBA")
-                buffer = BytesIO()
-                # Use JPEG for speed in preview
-                img.save(buffer, format="JPEG", quality=75)
-                buffer.seek(0)
-                return StreamingResponse(buffer, media_type="image/jpeg")
-        except Exception as e:
-            print(f"Preview conversion error: {e}")
+    
+    # SVG doesn't need processing
+    if ext == 'svg':
+        return FileResponse(path, media_type="image/svg+xml")
 
-    return FileResponse(path)
+    try:
+        with Image.open(path) as img:
+            # IMPORTANT: Always transpose for the preview so it matches the backend process coordinates
+            img = ImageOps.exif_transpose(img)
+            
+            # Convert to RGB/RGBA for browser compatibility
+            if img.mode not in ['RGB', 'RGBA']:
+                img = img.convert("RGBA")
+            
+            buffer = BytesIO()
+            # Use high-speed JPEG encoding for the preview playground
+            img.save(buffer, format="JPEG", quality=80) 
+            buffer.seek(0)
+            return StreamingResponse(buffer, media_type="image/jpeg")
+    except Exception as e:
+        print(f"Preview fail: {e}")
+        return FileResponse(path) # Absolute fallback
 
 @app.get("/api/download/{filename}")
 def download_file(filename: str):
