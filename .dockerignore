@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv/
+env/
+venv/
+.vscode/
+.idea/
+.git/
+outputs/
+uploads/
+Dockerfile
+.dockerignore
