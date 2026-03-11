@@ -268,6 +268,18 @@ async def create_zip(data: Request):
             
     return {"success": True, "url": f"/api/download/{zip_name}"}
 
+
+@app.get("/{path:path}")
+async def catch_all(path: str):
+    return JSONResponse(
+        status_code=200, 
+        content={
+            "success": True, 
+            "message": "Photo resizer server is active",
+            "captured_path": path
+        }
+    )
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=3020)
